@@ -3,5 +3,5 @@ Interoperability experiment between Python and Go via socket to run vectorizer u
 ### TO-DO
 - [x] Communicate using socket
 - [x] Send image as bytes through the socket
-- [ ] Receive vector value in Go from python with correct format
+- [x] Receive vector value in Go from python with correct format
 - [ ] Dockerize the app

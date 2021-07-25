@@ -6,12 +6,14 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"io"
 	"io/fs"
 	"log"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -40,6 +42,8 @@ func main() {
 	// Hit vectorizer concurrently!
 	for _, d := range dir {
 		wg.Add(1)
+		vector := []float32{}
+
 		// Connect to python vectorizer via socket
 		conn, err := net.Dial("tcp", hostname+":"+strconv.Itoa(PORT))
 		if err != nil {
@@ -89,6 +93,67 @@ func main() {
 			log.Println("Image has been sent! Yay")
 			defer wg.Done()
 		}(d)
+
+		// Receive the vector
+		localBuffer := new(bytes.Buffer)
+		readBuf := make([]byte, BUFFERSIZE)
+
+		data := ""
+		payloadSize := 0
+		firstPacket := true
+		for {
+			dataLen, err := conn.Read(readBuf)
+			if err != nil {
+				if err == io.EOF {
+					fmt.Println("Connection closed by client!")
+					break
+				}
+			}
+
+			localBuffer.Write(readBuf[:dataLen])
+
+			// Read header on first packet to know total length/size of payload
+			if firstPacket {
+
+				// fmt.Println("FIRST PACKET")
+
+				// Get the payload size from first 10 chars on the header
+				payloadSize, _ = strconv.Atoi(strings.TrimSpace(string(localBuffer.Bytes()[:HEADERSIZE])))
+
+				// First packet has been read, set the flag!
+				firstPacket = false
+
+				// Don't forget append first chunk of payload
+				data += string(localBuffer.Bytes()[HEADERSIZE:])
+
+			} else {
+
+				// fmt.Println("OTHER PACKET")
+
+				// Append payload chunks
+				data += string(localBuffer.Bytes())
+
+				// Check if current chunk is last part of payload
+				if len(data) == payloadSize {
+					// Parse data to proper format
+					sv := strings.Split(data, " ")
+					for _, v := range sv {
+						fv, _ := strconv.ParseFloat(v, 64)
+						vector = append(vector, float32(fv))
+					}
+
+					// Stop when finish read the payload
+					break
+				}
+			}
+			// fmt.Println("TOTAL LENGTH OF DATA: ", len(data))
+
+			// Go to next chunk
+			localBuffer.Next(BUFFERSIZE)
+		}
+
+		fmt.Println(len(vector))
 	}
 	wg.Wait()
+
 }

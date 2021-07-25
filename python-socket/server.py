@@ -43,9 +43,20 @@ while True:
       print("Message fully received. Start vectorizing the image!\n")
       vector = v.get_vector(Image.open(io.BytesIO(full_msg[HEADERSIZE:])))
 
+      vct = ""
+      for i in range(0, len(vector)):
+        if i != 0:
+          vct += " " + str(vector[i])
+        else:
+          vct += str(vector[i])
+
+      # Add the header for payload size
+      sent_msg = f"{len(vct):<{HEADERSIZE}}" + vct
+
       # Show / send the vector
-      print(f"Vector:  {vector}")
-      # client_socket.send(full_msg)
+      # print(f"Vector:  {vct}")
+      client_socket.send(bytes(sent_msg, "utf-8"))
+      print("Vector value has been sent!\n")
 
       # Reset the states
       new_msg = False
